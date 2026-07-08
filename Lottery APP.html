@@ -64,16 +64,12 @@
   </div>
 
   <div class="card no-print">
-    <h2>1. สแกน QR โค้ดจากสลาก</h2>
+    <h2>1. ถ่ายรูป หรือ เลือกรูปสลากที่มี QR โค้ด</h2>
     <div class="row">
-      <button class="primary" id="scanToggleBtn" onclick="toggleScan()">📷 เปิดกล้องสแกน QR</button>
-      <input type="file" id="qrFileInput" accept="image/*" multiple>
+      <button class="primary" onclick="document.getElementById('qrFileInput').click()">📷 ถ่ายรูป / เลือกรูปสลาก</button>
     </div>
-    <div id="scannerBox" style="display:none; margin-top:10px;">
-      <video id="qrVideo" playsinline style="width:100%; max-width:420px; border-radius:8px; border:1px solid #ccc; display:block; margin:0 auto;"></video>
-    </div>
-    <canvas id="qrCanvas" style="display:none;"></canvas>
-    <p style="font-size:12px; color:#888; margin-top:8px;">เล็งกล้องไปที่ QR โค้ดบนสลาก ระบบจะเพิ่มเลขชุด/เลขรางวัลเข้าใบปะหน้าปัจจุบันให้อัตโนมัติ หรือเลือกไฟล์รูปที่มี QR โค้ดเพื่อสแกนแทนก็ได้</p>
+    <input type="file" id="qrFileInput" accept="image/*" multiple style="display:none;">
+    <p style="font-size:12px; color:#888; margin-top:8px;">แตะปุ่มด้านบน แล้วเลือก "ถ่ายรูป" เพื่อถ่ายสลากใหม่ หรือเลือกจากคลังรูปภาพที่ถ่ายไว้แล้วก็ได้ (เลือกได้ครั้งละหลายรูป) ระบบจะอ่าน QR โค้ดแล้วเพิ่มเลขชุด/เลขรางวัลเข้าใบปะหน้าปัจจุบันให้อัตโนมัติ</p>
   </div>
 
   <div class="card no-print">
@@ -188,7 +184,7 @@ document.getElementById('qrFileInput').addEventListener('change', async (e)=>{
   } else if (detected > 0){
     showStatus('หมายเลขนี้ได้ทำการบันทึกไว้แล้ว', 'info');
   } else {
-    showStatus('ไม่พบโค้ดในรูปที่เลือก ลองถ่ายให้โค้ดอยู่ใกล้และคมชัดขึ้น หรือใช้ปุ่มเปิดกล้องสแกนแทน', 'error');
+    showStatus('ไม่พบโค้ดในรูปที่เลือก ลองถ่ายให้โค้ดอยู่ใกล้และคมชัดขึ้น', 'error');
   }
 });
 
@@ -343,70 +339,6 @@ function handleDecodedText(text){
   renderSheets();
   showStatus(`✅ เพิ่มเลข ${parsed.number} (ชุดที่ ${parsed.set}) จาก QR สำเร็จ`, 'success');
   return true;
-}
-
-// ---------- สแกน QR แบบสด (กล้อง) ----------
-let scanStream = null;
-let scanning = false;
-let lastScanAt = new Map(); // text -> เวลาที่เพิ่มล่าสุด (กันเพิ่มซ้ำถี่ๆ ต่อโค้ด รองรับหลายใบในเฟรมเดียว)
-
-async function toggleScan(){
-  if (scanning) { stopScan(); return; }
-  const box = document.getElementById('scannerBox');
-  const video = document.getElementById('qrVideo');
-  const btn = document.getElementById('scanToggleBtn');
-  try {
-    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    video.srcObject = scanStream;
-    await video.play();
-    box.style.display = 'block';
-    btn.textContent = '⏹ ปิดกล้องสแกน QR';
-    scanning = true;
-    showStatus('กล้องพร้อมแล้ว เล็งไปที่ QR โค้ดบนสลาก', 'info');
-    requestAnimationFrame(scanLoop);
-  } catch(err){
-    showStatus('เปิดกล้องไม่สำเร็จ: ' + err.message, 'error');
-  }
-}
-
-function stopScan(){
-  scanning = false;
-  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
-  document.getElementById('scannerBox').style.display = 'none';
-  document.getElementById('scanToggleBtn').textContent = '📷 เปิดกล้องสแกน QR';
-}
-
-let scanFrameBusy = false;
-async function scanLoop(){
-  if (!scanning) return;
-  const video = document.getElementById('qrVideo');
-  const canvas = document.getElementById('qrCanvas');
-  if (!scanFrameBusy && video.readyState === video.HAVE_ENOUGH_DATA){
-    scanFrameBusy = true;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const found = new Set();
-    (await detectAllWithNativeDetector(canvas)).forEach(t => found.add(t));
-    (await detectAllWithZxing(canvas)).forEach(t => found.add(t));
-    if (found.size === 0){
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
-      if (code) found.add(code.data);
-    }
-    const now = Date.now();
-    found.forEach(text => {
-      const last = lastScanAt.get(text) || 0;
-      if (now - last > 2500){
-        lastScanAt.set(text, now);
-        handleDecodedText(text);
-      }
-    });
-    scanFrameBusy = false;
-  }
-  requestAnimationFrame(scanLoop);
 }
 
 function renderSheets(){
