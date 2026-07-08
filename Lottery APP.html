@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>โปรแกรมสแกน QR ลอตเตอรี่ (A4 รวม 4 ใบ/หน้า)</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif; background:#f4f4f2; margin:0; padding:16px; color:#222; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  .sub { color:#666; font-size:13px; margin:0 0 20px; }
+  .card { background:#fff; border:1px solid #ddd; border-radius:10px; padding:16px; margin-bottom:16px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  input[type=text] { border:1px solid #ccc; border-radius:6px; padding:6px 8px; font-size:14px; }
+  button { border:1px solid #999; background:#fafafa; border-radius:6px; padding:8px 14px; font-size:14px; cursor:pointer; }
+  button.primary { background:#1a5fb4; color:#fff; border-color:#1a5fb4; }
+  button.danger { background:#c0392b; color:#fff; border-color:#c0392b; }
+  button.success { background:#2d7a3e; color:#fff; border-color:#2d7a3e; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th, td { border:1px solid #ddd; padding:4px 4px; text-align:center; }
+  th { background:#f0f0f0; }
+  .warn { color:#c0392b; font-weight:bold; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .tab { padding:6px 12px; border:1px solid #ccc; border-radius:16px; cursor:pointer; font-size:13px; background:#fff; }
+  .tab.active { background:#1a5fb4; color:#fff; border-color:#1a5fb4; }
+  .grid20 { display:grid; grid-template-columns:1fr 1fr; gap:10px; background:#fff; padding:10px; border:1px solid #ccc; border-radius:6px; }
+  .half-block { display:flex; gap:6px; align-items:flex-start; }
+  .half-block table { width:auto; }
+  .tbl-num { flex:1; }
+  .sheet-summary { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #ddd; padding-top:8px; margin-top:4px; font-size:11px; }
+  .status { font-size:12px; padding:2px 8px; border-radius:10px; }
+  .status.full { background:#dff0d8; color:#3c763d; }
+  .status.partial { background:#f0f0f0; color:#666; }
+  .status-banner { padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:16px; }
+  .status-banner.info { background:#eaf2fb; color:#1a5fb4; }
+  .status-banner.error { background:#fbeaea; color:#c0392b; }
+  .status-banner.success { background:#e7f5e9; color:#2d7a3e; }
+  .preview-container { display: flex; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+  .preview-box { border: 1px dashed #ccc; padding: 6px; background: #fff; border-radius: 6px; text-align: center; }
+  .preview-box span { display: block; font-size: 11px; color: #666; margin-bottom: 4px; }
+  .quick-box { background: #fcf8e3; border: 1px solid #fbeed5; padding: 12px; border-radius: 8px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>โปรแกรมสแกน QR ลอตเตอรี่ → ใบปะหน้าขนาดเท่าของจริง (6 × 12 ซม.)</h1>
+  <p class="sub">สแกน QR โค้ดบนสลากเพื่อดึงเลขชุด/เลขรางวัลอัตโนมัติ + จัดกลุ่มพิมพ์รวมลงกระดาษ A4 แผ่นเดียว (สูงสุด 4 ใบต่อหน้า)</p>
+  <div id="globalStatus" class="status-banner" style="display:none;"></div>
+
+  <!-- ระบบคีย์มือด่วน -->
+  <div class="card quick-box no-print">
+    <h2>⚡ คีย์ข้อมูลด่วนด้วยมือ</h2>
+    <div class="row">
+      <label>ชุดที่:</label>
+      <input type="text" id="manualSet" maxlength="2" style="width:50px; text-align:center;">
+      <label>เลขรางวัล (6 หลัก):</label>
+      <input type="text" id="manualNum" maxlength="6" style="width:110px; text-align:center; font-weight:bold; font-size:16px;">
+      <button class="success" onclick="addManualEntry()">+ เพิ่มเข้าใบปะหน้า</button>
+    </div>
+  </div>
+
+  <div class="card no-print">
+    <h2>1. สแกน QR โค้ดจากสลาก</h2>
+    <div class="row">
+      <button class="primary" id="scanToggleBtn" onclick="toggleScan()">📷 เปิดกล้องสแกน QR</button>
+      <input type="file" id="qrFileInput" accept="image/*" capture="environment" multiple>
+    </div>
+    <div id="scannerBox" style="display:none; margin-top:10px;">
+      <video id="qrVideo" playsinline style="width:100%; max-width:420px; border-radius:8px; border:1px solid #ccc; display:block; margin:0 auto;"></video>
+    </div>
+    <canvas id="qrCanvas" style="display:none;"></canvas>
+    <p style="font-size:12px; color:#888; margin-top:8px;">เล็งกล้องไปที่ QR โค้ดบนสลาก ระบบจะเพิ่มเลขชุด/เลขรางวัลเข้าใบปะหน้าปัจจุบันให้อัตโนมัติ หรือเลือกไฟล์รูปที่มี QR โค้ดเพื่อสแกนแทนก็ได้</p>
+  </div>
+
+  <div class="card no-print">
+    <div class="row" style="justify-content:space-between;">
+      <h2>2. ตัวอย่างจัดวางในระบบ (สูงสุด 20 รายการ/ใบ)</h2>
+      <button class="danger" id="clearAllBtn" onclick="clearAll()">ล้างข้อมูลทั้งหมด</button>
+    </div>
+    <div class="tabs" id="sheetTabs"></div>
+    <div id="sheetGrid" class="grid20" style="max-width: 450px; margin: 0 auto; border: 2px solid #222;"></div>
+  </div>
+
+  <div class="card no-print">
+    <h2>3. ส่งออกเป็น PDF กระดาษ A4 (รวมใบปะหน้าหลายใบในแผ่นเดียว)</h2>
+    <div class="checklist" id="exportChecklist"></div>
+    <div class="row">
+      <button class="primary" onclick="exportPDF()">ดาวน์โหลดเป็นไฟล์ PDF สำหรับพิมพ์บน A4</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script type="module">
+  // สลากกินแบ่งรัฐบาลพิมพ์โค้ดเป็น Data Matrix (ไม่ใช่ QR) — ใช้ ZXing ซึ่งอ่าน Data Matrix จากภาพถ่ายจริงได้แม่นยำกว่า
+  // เครื่องถอดรหัสของเบราว์เซอร์เอง (BarcodeDetector) และ jsQR มาก
+  import { readBarcodes } from 'https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/dist/es/reader/index.js';
+  window.zxingReadBarcodes = readBarcodes;
+</script>
+<script>
+let state = {
+  sheets: [{ id: 1, items: [] }],
+  activeSheetIndex: 0
+};
+
+function showStatus(msg, type='info'){
+  const el = document.getElementById('globalStatus');
+  if(el) {
+    el.textContent = msg;
+    el.className = 'status-banner ' + type;
+    el.style.display = 'block';
+  }
+}
+
+function loadState(){
+  try {
+    const raw = localStorage.getItem('lottery-cover-app-state');
+    if (raw) state = JSON.parse(raw);
+  } catch(e){}
+  renderSheets();
+}
+function saveState(){
+  try { localStorage.setItem('lottery-cover-app-state', JSON.stringify(state)); } catch(e){ console.error(e); }
+}
+
+function addManualEntry() {
+  const setEl = document.getElementById('manualSet');
+  const numEl = document.getElementById('manualNum');
+  let setVal = setEl.value.trim().padStart(2, '0');
+  let numVal = numEl.value.trim();
+
+  if (setVal === '00' || setVal === '') setVal = '19';
+  if (numVal.length !== 6 || isNaN(numVal)) {
+    alert('กรุณากรอกหมายเลขรางวัลให้ครบ 6 หลักครับ');
+    return;
+  }
+
+  const sheet = state.sheets[state.activeSheetIndex];
+  if (sheet.items.length >= 20) {
+    alert('ใบปะหน้านี้เต็ม 20 รายการแล้วครับ');
+    return;
+  }
+  if (sheet.items.some(x => x.set === setVal && x.number === numVal)) {
+    alert('หมายเลขนี้ได้ทำการบันทึกไว้แล้ว');
+    return;
+  }
+
+  sheet.items.push({ set: setVal, number: numVal, lengthMismatch: false });
+  saveState();
+  renderSheets();
+  numEl.value = '';
+  showStatus(`เพิ่มเลข ${numVal} (ชุดที่ ${setVal}) สำเร็จ`, 'success');
+}
+
+document.getElementById('manualNum').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') addManualEntry();
+});
+
+document.getElementById('qrFileInput').addEventListener('change', async (e)=>{
+  const files = [...e.target.files];
+  if (files.length === 0) return;
+  showStatus(`กำลังอ่านโค้ดจาก ${files.length} ไฟล์...`, 'info');
+  let detected = 0;
+  let found = 0;
+  for (const file of files){
+    try {
+      const texts = await decodeAllFromFile(file);
+      detected += texts.length;
+      for (const text of texts){
+        if (handleDecodedText(text)) found++;
+      }
+    } catch(err){
+      console.error(err);
+    }
+  }
+  e.target.value = '';
+  if (found > 0){
+    showStatus(`เพิ่มข้อมูลสำเร็จ ${found} ใบ`, 'success');
+  } else if (detected > 0){
+    showStatus('หมายเลขนี้ได้ทำการบันทึกไว้แล้ว', 'info');
+  } else {
+    showStatus('ไม่พบโค้ดในรูปที่เลือก ลองถ่ายให้โค้ดอยู่ใกล้และคมชัดขึ้น หรือใช้ปุ่มเปิดกล้องสแกนแทน', 'error');
+  }
+});
+
+// เครื่องถอดรหัสของเบราว์เซอร์เอง เร็วและฟรี แต่ในทางปฏิบัติแม่นเฉพาะ QR/บาร์โค้ดเส้น
+// ส่วน Data Matrix (ที่สลากกินแบ่งฯ ใช้จริง) พบว่าเครื่องนี้อ่านไม่ค่อยออกแม้ภาพชัด จึงลองก่อนแล้วค่อยใช้ ZXing เป็นตัวหลัก
+// ทั้งสองตัวรองรับการหาโค้ดหลายอันในภาพเดียว (กรณีถ่ายสลากหลายใบมาในรูปเดียว) จึงคืนค่าเป็นอาเรย์ ไม่ใช่แค่อันแรกที่เจอ
+const nativeBarcodeDetector = ('BarcodeDetector' in window) ? new BarcodeDetector({ formats: ['qr_code', 'data_matrix'] }) : null;
+
+async function detectAllWithNativeDetector(source){
+  if (!nativeBarcodeDetector) return [];
+  try {
+    const results = await nativeBarcodeDetector.detect(source);
+    return (results || []).map(r => r.rawValue).filter(Boolean);
+  } catch(err){
+    console.error('BarcodeDetector error:', err);
+    return [];
+  }
+}
+
+// ZXing อ่าน Data Matrix จากภาพถ่ายจริงได้แม่นกว่ามาก — ใช้เป็นตัวถอดรหัสหลัก
+async function detectAllWithZxing(source){
+  if (!window.zxingReadBarcodes) return [];
+  try {
+    const results = await window.zxingReadBarcodes(source, { formats: ['DataMatrix', 'QRCode'], tryHarder: true });
+    return (results || []).map(r => r.text).filter(Boolean);
+  } catch(err){
+    console.error('ZXing error:', err);
+    return [];
+  }
+}
+
+// อ่านไฟล์รูปภาพ -> รวมผลจาก BarcodeDetector ของเบราว์เซอร์ + ZXing (แม่นสุดสำหรับ Data Matrix)
+// ถ้ายังไม่เจอเลยค่อย fallback ไป jsQR (เผื่อ QR ล้วนๆ) — คืนค่าเป็นรายการโค้ดทั้งหมดที่พบ (ไม่ใช่แค่อันแรก) เพื่อรองรับภาพที่มีสลากหลายใบ
+function decodeAllFromFile(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=> reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=> reject(new Error('เปิดรูปไม่สำเร็จ'));
+      img.onload = async ()=>{
+        try {
+          const found = new Set();
+          (await detectAllWithNativeDetector(img)).forEach(t => found.add(t));
+          (await detectAllWithZxing(file)).forEach(t => found.add(t));
+          if (found.size === 0){
+            const single = scanImageForQr(img);
+            if (single) found.add(single);
+          }
+          resolve([...found]);
+        } catch(err){ reject(err); }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// รอบที่ 1: สแกนภาพเต็มก่อน
+// รอบที่ 2: ถ้าไม่พบ ลองแปลงเป็นขาวดำเพิ่มคอนทราสต์แล้วสแกนภาพเต็มอีกครั้ง (ช่วยกรณีแสงสะท้อน/พิมพ์จาง)
+// รอบที่ 3: ถ้ายังไม่พบ ให้ไล่สแกนทีละส่วนย่อย (grid 4x4 ทับกันเล็กน้อย) ที่ความละเอียดต้นฉบับ
+// ช่วยกรณีถ่ายทั้งใบสลากมาแล้ว QR โค้ดเป็นจุดเล็กๆ ในภาพ ทำให้ jsQR หา finder pattern เจอยากขึ้น
+function scanImageForQr(img){
+  const fullCanvas = document.createElement('canvas');
+  fullCanvas.width = img.naturalWidth;
+  fullCanvas.height = img.naturalHeight;
+  const fullCtx = fullCanvas.getContext('2d');
+  fullCtx.drawImage(img, 0, 0);
+
+  const fullData = fullCtx.getImageData(0, 0, fullCanvas.width, fullCanvas.height);
+  const fullCode = jsQR(fullData.data, fullData.width, fullData.height, { inversionAttempts: 'attemptBoth' });
+  if (fullCode) return fullCode.data;
+
+  const contrastData = grayscaleContrastStretch(fullData);
+  const contrastCode = jsQR(contrastData.data, contrastData.width, contrastData.height, { inversionAttempts: 'attemptBoth' });
+  if (contrastCode) return contrastCode.data;
+
+  const cols = 4, rows = 4, overlap = 0.25;
+  const tileW = fullCanvas.width / cols;
+  const tileH = fullCanvas.height / rows;
+  for (let r = 0; r < rows; r++){
+    for (let c = 0; c < cols; c++){
+      const x = Math.max(0, c * tileW - tileW * overlap);
+      const y = Math.max(0, r * tileH - tileH * overlap);
+      const w = Math.min(fullCanvas.width - x, tileW * (1 + overlap * 2));
+      const h = Math.min(fullCanvas.height - y, tileH * (1 + overlap * 2));
+      const tileCanvas = document.createElement('canvas');
+      tileCanvas.width = w;
+      tileCanvas.height = h;
+      const tileCtx = tileCanvas.getContext('2d');
+      tileCtx.drawImage(fullCanvas, x, y, w, h, 0, 0, w, h);
+      const tileData = tileCtx.getImageData(0, 0, w, h);
+      const tileCode = jsQR(tileData.data, tileData.width, tileData.height, { inversionAttempts: 'attemptBoth' });
+      if (tileCode) return tileCode.data;
+    }
+  }
+  return null;
+}
+
+// แปลงภาพเป็นขาวดำแล้วดึงคอนทราสต์ให้เต็มช่วง (min-max stretch) ช่วยดึงลวดลาย QR ที่จางจากแสงสะท้อนให้ชัดขึ้น
+function grayscaleContrastStretch(imageData){
+  const { data, width, height } = imageData;
+  const out = new Uint8ClampedArray(data.length);
+  const gray = new Uint8ClampedArray(width * height);
+  let min = 255, max = 0;
+  for (let i = 0, p = 0; i < data.length; i += 4, p++){
+    const g = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+    gray[p] = g;
+    if (g < min) min = g;
+    if (g > max) max = g;
+  }
+  const range = Math.max(1, max - min);
+  for (let p = 0, i = 0; p < gray.length; p++, i += 4){
+    const stretched = ((gray[p] - min) / range) * 255;
+    out[i] = out[i+1] = out[i+2] = stretched;
+    out[i+3] = 255;
+  }
+  return { data: out, width, height };
+}
+
+// ---------- แกะข้อมูลจาก QR โค้ดของสลาก ----------
+// รูปแบบข้อความใน QR: "{ปีพ.ศ. 2 หลัก}-{งวดที่}-{ชุดที่}-{เลขรางวัล 6 หลัก}-{ท้ายเลขที่สลาก}"
+// เช่น "69-26-42-947531-9735" -> งวดที่ 26, ชุดที่ 42, เลขรางวัล 947531
+function parseQrText(text){
+  const t = (text || '').trim();
+  const parts = t.split('-').map(p => p.trim());
+  if (parts.length !== 5) return null;
+  const [, , set, number] = parts;
+  if (!/^\d{6}$/.test(number)) return null;
+  if (!/^\d{1,2}$/.test(set)) return null;
+  return { set: set.padStart(2, '0'), number };
+}
+
+// เพิ่มรายการที่ถอดรหัสได้ลงใบปะหน้าปัจจุบัน (คืนค่า true หากเพิ่มสำเร็จ)
+function handleDecodedText(text){
+  const parsed = parseQrText(text);
+  if (!parsed) {
+    showStatus('อ่าน QR ไม่สำเร็จ: รูปแบบข้อมูลไม่ตรงกับสลาก (' + text + ')', 'error');
+    return false;
+  }
+  const sheet = state.sheets[state.activeSheetIndex];
+  if (sheet.items.length >= 20) {
+    showStatus('ใบปะหน้านี้เต็ม 20 รายการแล้วครับ', 'error');
+    return false;
+  }
+  if (sheet.items.some(x => x.set === parsed.set && x.number === parsed.number)) {
+    showStatus('หมายเลขนี้ได้ทำการบันทึกไว้แล้ว', 'info');
+    return false;
+  }
+  sheet.items.push({ set: parsed.set, number: parsed.number, lengthMismatch: false });
+  saveState();
+  renderSheets();
+  showStatus(`✅ เพิ่มเลข ${parsed.number} (ชุดที่ ${parsed.set}) จาก QR สำเร็จ`, 'success');
+  return true;
+}
+
+// ---------- สแกน QR แบบสด (กล้อง) ----------
+let scanStream = null;
+let scanning = false;
+let lastScanAt = new Map(); // text -> เวลาที่เพิ่มล่าสุด (กันเพิ่มซ้ำถี่ๆ ต่อโค้ด รองรับหลายใบในเฟรมเดียว)
+
+async function toggleScan(){
+  if (scanning) { stopScan(); return; }
+  const box = document.getElementById('scannerBox');
+  const video = document.getElementById('qrVideo');
+  const btn = document.getElementById('scanToggleBtn');
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = scanStream;
+    await video.play();
+    box.style.display = 'block';
+    btn.textContent = '⏹ ปิดกล้องสแกน QR';
+    scanning = true;
+    showStatus('กล้องพร้อมแล้ว เล็งไปที่ QR โค้ดบนสลาก', 'info');
+    requestAnimationFrame(scanLoop);
+  } catch(err){
+    showStatus('เปิดกล้องไม่สำเร็จ: ' + err.message, 'error');
+  }
+}
+
+function stopScan(){
+  scanning = false;
+  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  document.getElementById('scannerBox').style.display = 'none';
+  document.getElementById('scanToggleBtn').textContent = '📷 เปิดกล้องสแกน QR';
+}
+
+let scanFrameBusy = false;
+async function scanLoop(){
+  if (!scanning) return;
+  const video = document.getElementById('qrVideo');
+  const canvas = document.getElementById('qrCanvas');
+  if (!scanFrameBusy && video.readyState === video.HAVE_ENOUGH_DATA){
+    scanFrameBusy = true;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const found = new Set();
+    (await detectAllWithNativeDetector(canvas)).forEach(t => found.add(t));
+    (await detectAllWithZxing(canvas)).forEach(t => found.add(t));
+    if (found.size === 0){
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+      if (code) found.add(code.data);
+    }
+    const now = Date.now();
+    found.forEach(text => {
+      const last = lastScanAt.get(text) || 0;
+      if (now - last > 2500){
+        lastScanAt.set(text, now);
+        handleDecodedText(text);
+      }
+    });
+    scanFrameBusy = false;
+  }
+  requestAnimationFrame(scanLoop);
+}
+
+function renderSheets(){
+  const tabs = document.getElementById('sheetTabs');
+  tabs.innerHTML = '';
+  state.sheets.forEach((sheet, i)=>{
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (i===state.activeSheetIndex?' active':'');
+    tab.textContent = `ใบ #${sheet.id} (${sheet.items.length}/20)`;
+    tab.onclick = ()=>{ state.activeSheetIndex = i; renderSheets(); };
+    tabs.appendChild(tab);
+  });
+  if (state.sheets.length < 30){
+    const addTab = document.createElement('div');
+    addTab.className = 'tab';
+    addTab.textContent = '+ ใบใหม่';
+    addTab.onclick = ()=>{
+      const nextId = Math.max(...state.sheets.map(s=>s.id)) + 1;
+      state.sheets.push({ id: nextId, items: [] });
+      state.activeSheetIndex = state.sheets.length - 1;
+      saveState(); renderSheets();
+    };
+    tabs.appendChild(addTab);
+  }
+
+  const grid = document.getElementById('sheetGrid');
+  grid.innerHTML = '';
+  const items = state.sheets[state.activeSheetIndex].items;
+  [ [1,10], [11,20] ].forEach(([start,end])=>{
+    let rowsSet = '', rowsNum = '';
+    for (let n=start; n<=end; n++){
+      const item = items[n-1];
+      rowsSet += `<tr><td>${n}</td><td>${item ? item.set : '-'}</td></tr>`;
+      rowsNum += `<tr><td>${item ? item.number : '-'}</td></tr>`;
+    }
+    const half = document.createElement('div');
+    half.className = 'half-block';
+    half.innerHTML = `
+      <table class="tbl-set">
+        <thead><tr><th>ลป.</th><th>ชุด</th></tr></thead>
+        <tbody>${rowsSet}</tbody>
+      </table>
+      <table class="tbl-num">
+        <thead><tr><th>หมายเลขรางวัล</th></tr></thead>
+        <tbody>${rowsNum}</tbody>
+      </table>`;
+    grid.appendChild(half);
+  });
+
+  const summary = document.createElement('div');
+  summary.className = 'sheet-summary';
+  summary.innerHTML = `<span>ผู้ตรวจ: .......................................</span><span>รวม <b>${items.length}</b> ชุด</span>`;
+  grid.appendChild(summary);
+
+  renderExportChecklist();
+}
+
+let selectedForExport = new Set();
+function renderExportChecklist(){
+  const el = document.getElementById('exportChecklist');
+  el.innerHTML = '';
+  state.sheets.forEach((sheet)=>{
+    const row = document.createElement('label');
+    row.style.display = 'block';
+    row.style.margin = '4px 0';
+    const checked = selectedForExport.has(sheet.id) ? 'checked' : '';
+    row.innerHTML = `<input type="checkbox" ${checked} onchange="toggleExport(${sheet.id}, this.checked)"> ใบปะหน้า #${sheet.id} (${sheet.items.length}/20 ใบ)`;
+    el.appendChild(row);
+  });
+}
+function toggleExport(id, checked){
+  if (checked) selectedForExport.add(id);
+  else selectedForExport.delete(id);
+}
+
+const labelImageCache = {};
+function renderLabelPNG(text, fontPx=32){
+  if (labelImageCache[text]) return labelImageCache[text];
+  const canvas = document.createElement('canvas');
+  let ctx = canvas.getContext('2d');
+  ctx.font = 'bold ' + fontPx + 'px sans-serif';
+  const w = Math.max(1, Math.ceil(ctx.measureText(text).width) + 6);
+  const h = Math.ceil(fontPx * 1.3);
+  canvas.width = w; canvas.height = h;
+  ctx = canvas.getContext('2d');
+  ctx.font = 'bold ' + fontPx + 'px sans-serif';
+  ctx.fillStyle = '#000000';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 3, h/2);
+  const result = { dataUrl: canvas.toDataURL('image/png'), w, h };
+  labelImageCache[text] = result;
+  return result;
+}
+
+function addLabelCentered(doc, text, cx, cy, targetHmm){
+  const { dataUrl, w, h } = renderLabelPNG(text);
+  const targetWmm = targetHmm * (w/h);
+  doc.addImage(dataUrl, 'PNG', cx - targetWmm/2, cy - targetHmm/2, targetWmm, targetHmm);
+}
+
+function addLabelAt(doc, text, x, cy, targetHmm, align='left'){
+  const { dataUrl, w, h } = renderLabelPNG(text);
+  const targetWmm = targetHmm * (w/h);
+  const drawX = align === 'right' ? x - targetWmm : x;
+  doc.addImage(dataUrl, 'PNG', drawX, cy - targetHmm/2, targetWmm, targetHmm);
+}
+
+// วาดกล่องใบปะหน้าเดี่ยวขนาด 60mm x 120mm ลงพิกัด x, y บน A4
+function drawMiniSheetToPosition(doc, sheet, startX, startY) {
+  const widthMm = 60;
+
+  doc.setDrawColor(0, 0, 0);
+
+  // จัด Margin ภายในกล่องสลาก
+  const innerMarginX = 2.5;
+  const innerMarginY = 5;
+
+  const cellW = 3.6, cellH = 4.4, headerH = 4.4, seqColW = 3.6, gapAB = 1.2, gapGroups = 3.0;
+  const groupWidth = seqColW + (2 * cellW) + gapAB + (6 * cellW);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+
+  [ [1,10], [11,20] ].forEach(([start,end], groupIdx)=>{
+    const gx = startX + innerMarginX + groupIdx * (groupWidth + gapGroups);
+    const y = startY + innerMarginY;
+
+    // หัวตาราง
+    doc.rect(gx, y, seqColW, headerH);
+    addLabelCentered(doc, 'ลป.', gx + seqColW/2, y + headerH/2, 1.8);
+
+    doc.rect(gx + seqColW, y, 2 * cellW, headerH);
+    addLabelCentered(doc, 'ชุดที่', gx + seqColW + cellW, y + headerH/2, 1.8);
+
+    const bx = gx + seqColW + (2 * cellW) + gapAB;
+    doc.rect(bx, y, 6 * cellW, headerH);
+    addLabelCentered(doc, 'หมายเลขรางวัล', bx + 3 * cellW, y + headerH/2, 1.8);
+
+    // เนื้อหาข้อมูลเลข
+    for (let n=start; n<=end; n++){
+      const ry = y + headerH + (n - start) * cellH;
+      const item = sheet.items[n-1];
+
+      doc.rect(gx, ry, seqColW, cellH);
+      doc.text(String(n), gx + seqColW/2, ry + cellH/2 + 0.8, { align:'center' });
+
+      for (let d=0; d<2; d++){
+        doc.rect(gx + seqColW + d * cellW, ry, cellW, cellH);
+        if (item && item.set) {
+          doc.text(item.set[d] || '', gx + seqColW + d * cellW + cellW/2, ry + cellH/2 + 0.8, { align:'center' });
+        }
+      }
+
+      for (let d=0; d<6; d++){
+        doc.rect(bx + d * cellW, ry, cellW, cellH);
+        if (item && item.number) {
+          doc.text(item.number[d] || '', bx + d * cellW + cellW/2, ry + cellH/2 + 0.8, { align:'center' });
+        }
+      }
+    }
+  });
+
+  const bottomY = startY + innerMarginY + headerH + 10 * cellH + 6;
+  addLabelAt(doc, 'ลงชื่อ(ตัวบรรจง)....................', startX + innerMarginX, bottomY, 2.2, 'left');
+  addLabelAt(doc, `รวม ${sheet.items.length} ชุด`, startX + widthMm - innerMarginX, bottomY, 2.2, 'right');
+}
+
+async function exportPDF(){
+  const sheetsToExport = state.sheets.filter(s=>selectedForExport.has(s.id));
+  if (sheetsToExport.length===0){ showStatus('กรุณาเลือกใบปะหน้าในข้อ 3 อย่างน้อย 1 ใบครับ', 'error'); return; }
+  
+  try {
+    const { jsPDF } = window.jspdf;
+    // สร้างเอกสารเป็นขนาดมาตรฐาน A4 (210mm x 297mm)
+    const doc = new jsPDF({
+      unit: 'mm',
+      format: 'a4',
+      orientation: 'portrait'
+    });
+
+    // กำหนดตำแหน่งพิกัดแบบตารางกริดยัดลงหน้า A4 (ใบปะหน้ากว้าง 60mm สูง 120mm)
+    // แนวตั้งใส่ได้สูงสุด 2 แถว (2 × 120mm = 240mm ยังพอดีกับความสูงหน้า A4 ที่ 297mm)
+    // ใส่ได้ 3 แถวไม่พอ (3 × 120mm = 360mm เกินความสูงหน้ากระดาษ) จึงตรึงไว้ที่ 4 ใบ/หน้า (2 คอลัมน์ × 2 แถว)
+    const SHEETS_PER_PAGE = 4;
+    const startMarginX = 37.5;
+    const startMarginY = 15;
+    const gapX = 15;
+    const gapY = 27;
+
+    sheetsToExport.forEach((sheet, idx)=>{
+      const posIndex = idx % SHEETS_PER_PAGE;
+
+      if (idx > 0 && posIndex === 0) {
+        doc.addPage('a4', 'portrait');
+      }
+
+      // คำนวณหาตำแหน่งแบบ Row & Column บนกระดาษ A4 (2 คอลัมน์ × 2 แถว)
+      const row = Math.floor(posIndex / 2);
+      const col = posIndex % 2;
+
+      const posX = startMarginX + col * (60 + gapX);
+      const posY = startMarginY + row * (120 + gapY);
+
+      drawMiniSheetToPosition(doc, sheet, posX, posY);
+    });
+
+    doc.save('ใบปะหน้าลอตเตอรี่_ชุดรวมพิมพ์_A4.pdf');
+    showStatus('ดาวน์โหลดไฟล์ PDF สำเร็จ! ใบปะหน้าจะถูกจัดเรียงในหน้า A4 ขนาดใบละ 6x12 cm เท่าใบสลากจริง สั่งปริ้นแล้วตัดแบ่งได้ทันทีครับ', 'success');
+  } catch(e){
+    showStatus('สร้าง PDF ไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+let clearConfirmPending = false;
+let clearConfirmTimeout = null;
+function clearAll(){
+  const btn = document.getElementById('clearAllBtn');
+  if (!clearConfirmPending){
+    clearConfirmPending = true;
+    btn.textContent = 'กดอีกครั้งเพื่อยืนยันการล้าง';
+    clearConfirmTimeout = setTimeout(()=>{
+      clearConfirmPending = false;
+      btn.textContent = 'ล้างข้อมูลทั้งหมด';
+    }, 4000);
+    return;
+  }
+  clearTimeout(clearConfirmTimeout);
+  clearConfirmPending = false;
+  btn.textContent = 'ล้างข้อมูลทั้งหมด';
+  doClearAll();
+}
+
+async function doClearAll(){
+  state = { sheets: [{ id: 1, items: [] }], activeSheetIndex: 0 };
+  selectedForExport = new Set();
+  document.getElementById('qrFileInput').value = '';
+  try { localStorage.removeItem('lottery-cover-app-state'); } catch(e){}
+  renderSheets();
+  showStatus('ล้างข้อมูลทั้งหมดเรียบร้อยแล้ว', 'success');
+}
+
+loadState();
+</script>
+</body>
+</html>
