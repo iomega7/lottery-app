@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>โปรแกรมสแกน QR ลอตเตอรี่ (A4 รวม 4 ใบ/หน้า)</title>
+<title>โปรแกรมสแกน QR ลอตเตอรี่ (A4 รวม 6 ใบ/หน้า)</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif; background:#f4f4f2; margin:0; padding:16px; color:#222; }
@@ -30,7 +30,7 @@
   .half-block { display:flex; gap:6px; align-items:flex-start; }
   .half-block table { width:auto; }
   .tbl-num { flex:1; }
-  .sheet-summary { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #ddd; padding-top:8px; margin-top:4px; font-size:11px; }
+  .sheet-summary { grid-column:1 / -1; display:flex; justify-content:flex-end; align-items:center; border-top:1px solid #ddd; padding-top:8px; margin-top:4px; font-size:11px; }
   .status { font-size:12px; padding:2px 8px; border-radius:10px; }
   .status.full { background:#dff0d8; color:#3c763d; }
   .status.partial { background:#f0f0f0; color:#666; }
@@ -47,8 +47,8 @@
 <body>
 <div class="wrap">
 
-  <h1>โปรแกรมสแกน QR ลอตเตอรี่ → ใบปะหน้าขนาดเท่าของจริง (6 × 12 ซม.)</h1>
-  <p class="sub">สแกน QR โค้ดบนสลากเพื่อดึงเลขชุด/เลขรางวัลอัตโนมัติ + จัดกลุ่มพิมพ์รวมลงกระดาษ A4 แผ่นเดียว (สูงสุด 4 ใบต่อหน้า)</p>
+  <h1>โปรแกรมสแกน QR ลอตเตอรี่ → ใบปะหน้าขนาดเท่าของจริง (12 × 6 ซม.)</h1>
+  <p class="sub">สแกน QR โค้ดบนสลากเพื่อดึงเลขชุด/เลขรางวัลอัตโนมัติ + จัดกลุ่มพิมพ์รวมลงกระดาษ A4 แนวนอน แผ่นเดียว (สูงสุด 6 ใบต่อหน้า)</p>
   <div id="globalStatus" class="status-banner" style="display:none;"></div>
 
   <!-- ระบบคีย์มือด่วน -->
@@ -67,7 +67,7 @@
     <h2>1. สแกน QR โค้ดจากสลาก</h2>
     <div class="row">
       <button class="primary" id="scanToggleBtn" onclick="toggleScan()">📷 เปิดกล้องสแกน QR</button>
-      <input type="file" id="qrFileInput" accept="image/*" capture="environment" multiple>
+      <input type="file" id="qrFileInput" accept="image/*" multiple>
     </div>
     <div id="scannerBox" style="display:none; margin-top:10px;">
       <video id="qrVideo" playsinline style="width:100%; max-width:420px; border-radius:8px; border:1px solid #ccc; display:block; margin:0 auto;"></video>
@@ -87,6 +87,9 @@
 
   <div class="card no-print">
     <h2>3. ส่งออกเป็น PDF กระดาษ A4 (รวมใบปะหน้าหลายใบในแผ่นเดียว)</h2>
+    <div class="row" style="margin-bottom:6px;">
+      <button id="selectAllBtn" onclick="toggleSelectAll()">เลือกทั้งหมด</button>
+    </div>
     <div class="checklist" id="exportChecklist"></div>
     <div class="row">
       <button class="primary" onclick="exportPDF()">ดาวน์โหลดเป็นไฟล์ PDF สำหรับพิมพ์บน A4</button>
@@ -416,7 +419,7 @@ function renderSheets(){
     tab.onclick = ()=>{ state.activeSheetIndex = i; renderSheets(); };
     tabs.appendChild(tab);
   });
-  if (state.sheets.length < 30){
+  if (state.sheets.length < 6){
     const addTab = document.createElement('div');
     addTab.className = 'tab';
     addTab.textContent = '+ ใบใหม่';
@@ -443,7 +446,7 @@ function renderSheets(){
     half.className = 'half-block';
     half.innerHTML = `
       <table class="tbl-set">
-        <thead><tr><th>ลป.</th><th>ชุด</th></tr></thead>
+        <thead><tr><th></th><th>ชุด</th></tr></thead>
         <tbody>${rowsSet}</tbody>
       </table>
       <table class="tbl-num">
@@ -455,7 +458,7 @@ function renderSheets(){
 
   const summary = document.createElement('div');
   summary.className = 'sheet-summary';
-  summary.innerHTML = `<span>ผู้ตรวจ: .......................................</span><span>รวม <b>${items.length}</b> ชุด</span>`;
+  summary.innerHTML = `<span>รวม <b>${items.length}</b> ชุด</span>`;
   grid.appendChild(summary);
 
   renderExportChecklist();
@@ -473,13 +476,30 @@ function renderExportChecklist(){
     row.innerHTML = `<input type="checkbox" ${checked} onchange="toggleExport(${sheet.id}, this.checked)"> ใบปะหน้า #${sheet.id} (${sheet.items.length}/20 ใบ)`;
     el.appendChild(row);
   });
+  updateSelectAllBtn();
 }
 function toggleExport(id, checked){
   if (checked) selectedForExport.add(id);
   else selectedForExport.delete(id);
+  updateSelectAllBtn();
+}
+function updateSelectAllBtn(){
+  const btn = document.getElementById('selectAllBtn');
+  if (!btn) return;
+  const allSelected = state.sheets.length > 0 && state.sheets.every(s => selectedForExport.has(s.id));
+  btn.textContent = allSelected ? 'ยกเลิกเลือกทั้งหมด' : 'เลือกทั้งหมด';
+}
+function toggleSelectAll(){
+  const allSelected = state.sheets.length > 0 && state.sheets.every(s => selectedForExport.has(s.id));
+  if (allSelected) selectedForExport.clear();
+  else state.sheets.forEach(s => selectedForExport.add(s.id));
+  renderExportChecklist();
 }
 
 const labelImageCache = {};
+// ใช้ JPEG (ไม่มีช่องอัลฟา/โปร่งใสในระดับฟอร์แมตไฟล์เลย) แทน PNG เพื่อไม่ให้ jsPDF ต้องสร้าง SMask
+// PNG จาก canvas.toDataURL จะมีช่อง alpha ติดมาเสมอแม้ทุกพิกเซลทึบ 100% ทำให้ jsPDF สร้างภาพ SMask แถมมาด้วยทุกครั้ง
+// ตัวอ่าน PDF บางตัว (เช่น Adobe Acrobat เวลาสั่งพิมพ์) ตรวจสอบภาพที่มี SMask เข้มงวดกว่าและอาจปฏิเสธการพิมพ์ได้
 function renderLabelPNG(text, fontPx=32){
   if (labelImageCache[text]) return labelImageCache[text];
   const canvas = document.createElement('canvas');
@@ -489,11 +509,13 @@ function renderLabelPNG(text, fontPx=32){
   const h = Math.ceil(fontPx * 1.3);
   canvas.width = w; canvas.height = h;
   ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
   ctx.font = 'bold ' + fontPx + 'px sans-serif';
   ctx.fillStyle = '#000000';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, 3, h/2);
-  const result = { dataUrl: canvas.toDataURL('image/png'), w, h };
+  const result = { dataUrl: canvas.toDataURL('image/jpeg', 0.95), w, h };
   labelImageCache[text] = result;
   return result;
 }
@@ -501,19 +523,19 @@ function renderLabelPNG(text, fontPx=32){
 function addLabelCentered(doc, text, cx, cy, targetHmm){
   const { dataUrl, w, h } = renderLabelPNG(text);
   const targetWmm = targetHmm * (w/h);
-  doc.addImage(dataUrl, 'PNG', cx - targetWmm/2, cy - targetHmm/2, targetWmm, targetHmm);
+  doc.addImage(dataUrl, 'JPEG', cx - targetWmm/2, cy - targetHmm/2, targetWmm, targetHmm);
 }
 
 function addLabelAt(doc, text, x, cy, targetHmm, align='left'){
   const { dataUrl, w, h } = renderLabelPNG(text);
   const targetWmm = targetHmm * (w/h);
   const drawX = align === 'right' ? x - targetWmm : x;
-  doc.addImage(dataUrl, 'PNG', drawX, cy - targetHmm/2, targetWmm, targetHmm);
+  doc.addImage(dataUrl, 'JPEG', drawX, cy - targetHmm/2, targetWmm, targetHmm);
 }
 
-// วาดกล่องใบปะหน้าเดี่ยวขนาด 60mm x 120mm ลงพิกัด x, y บน A4
+// วาดกล่องใบปะหน้าเดี่ยวขนาด 120mm x 60mm (แนวนอน เท่าของจริง) ลงพิกัด x, y บน A4
 function drawMiniSheetToPosition(doc, sheet, startX, startY) {
-  const widthMm = 60;
+  const widthMm = 120;
 
   doc.setDrawColor(0, 0, 0);
 
@@ -521,34 +543,37 @@ function drawMiniSheetToPosition(doc, sheet, startX, startY) {
   const innerMarginX = 2.5;
   const innerMarginY = 5;
 
-  const cellW = 3.6, cellH = 4.4, headerH = 4.4, seqColW = 3.6, gapAB = 1.2, gapGroups = 3.0;
+  const cellW = 6, cellH = 4.4, headerH = 4.4, seqColW = 6, gapAB = 2, gapGroups = 3.0;
   const groupWidth = seqColW + (2 * cellW) + gapAB + (6 * cellW);
 
+  const SEQ_FONT_SIZE = 9;
+  const DATA_FONT_SIZE = 7;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
+  doc.setFontSize(DATA_FONT_SIZE);
 
   [ [1,10], [11,20] ].forEach(([start,end], groupIdx)=>{
     const gx = startX + innerMarginX + groupIdx * (groupWidth + gapGroups);
     const y = startY + innerMarginY;
 
-    // หัวตาราง
+    // หัวตาราง (เพิ่มขนาด/ตัวหนาให้เด่นกว่าตัวเลขที่กรอก, คอลัมน์ ลป. ไม่มีคำบรรยายหัวตาราง)
     doc.rect(gx, y, seqColW, headerH);
-    addLabelCentered(doc, 'ลป.', gx + seqColW/2, y + headerH/2, 1.8);
 
     doc.rect(gx + seqColW, y, 2 * cellW, headerH);
-    addLabelCentered(doc, 'ชุดที่', gx + seqColW + cellW, y + headerH/2, 1.8);
+    addLabelCentered(doc, 'ชุดที่', gx + seqColW + cellW, y + headerH/2, 3.3);
 
     const bx = gx + seqColW + (2 * cellW) + gapAB;
     doc.rect(bx, y, 6 * cellW, headerH);
-    addLabelCentered(doc, 'หมายเลขรางวัล', bx + 3 * cellW, y + headerH/2, 1.8);
+    addLabelCentered(doc, 'หมายเลขรางวัล', bx + 3 * cellW, y + headerH/2, 3.3);
 
-    // เนื้อหาข้อมูลเลข
+    // เนื้อหาข้อมูลเลข (ลำดับ ลป. เป็นส่วนของเทมเพลตจึงขยายใหญ่ขึ้นด้วย ส่วนตัวเลขที่กรอก/สแกนคงขนาดเดิม)
     for (let n=start; n<=end; n++){
       const ry = y + headerH + (n - start) * cellH;
       const item = sheet.items[n-1];
 
       doc.rect(gx, ry, seqColW, cellH);
+      doc.setFontSize(SEQ_FONT_SIZE);
       doc.text(String(n), gx + seqColW/2, ry + cellH/2 + 0.8, { align:'center' });
+      doc.setFontSize(DATA_FONT_SIZE);
 
       for (let d=0; d<2; d++){
         doc.rect(gx + seqColW + d * cellW, ry, cellW, cellH);
@@ -567,8 +592,8 @@ function drawMiniSheetToPosition(doc, sheet, startX, startY) {
   });
 
   const bottomY = startY + innerMarginY + headerH + 10 * cellH + 6;
-  addLabelAt(doc, 'ลงชื่อ(ตัวบรรจง)....................', startX + innerMarginX, bottomY, 2.2, 'left');
-  addLabelAt(doc, `รวม ${sheet.items.length} ชุด`, startX + widthMm - innerMarginX, bottomY, 2.2, 'right');
+  addLabelAt(doc, 'ลงชื่อ(ตัวบรรจง)....................', startX + innerMarginX, bottomY, 3.8, 'left');
+  addLabelAt(doc, `รวม ${sheet.items.length} ชุด`, startX + widthMm - innerMarginX, bottomY, 3.8, 'right');
 }
 
 async function exportPDF(){
@@ -577,41 +602,44 @@ async function exportPDF(){
   
   try {
     const { jsPDF } = window.jspdf;
-    // สร้างเอกสารเป็นขนาดมาตรฐาน A4 (210mm x 297mm)
+    // สร้างเอกสารเป็นขนาดมาตรฐาน A4 แนวนอน (297mm x 210mm) เพื่อวางใบปะหน้ากว้าง 120mm ได้ 2 คอลัมน์/แถว
     const doc = new jsPDF({
       unit: 'mm',
       format: 'a4',
-      orientation: 'portrait'
+      orientation: 'landscape'
     });
 
-    // กำหนดตำแหน่งพิกัดแบบตารางกริดยัดลงหน้า A4 (ใบปะหน้ากว้าง 60mm สูง 120mm)
-    // แนวตั้งใส่ได้สูงสุด 2 แถว (2 × 120mm = 240mm ยังพอดีกับความสูงหน้า A4 ที่ 297mm)
-    // ใส่ได้ 3 แถวไม่พอ (3 × 120mm = 360mm เกินความสูงหน้ากระดาษ) จึงตรึงไว้ที่ 4 ใบ/หน้า (2 คอลัมน์ × 2 แถว)
-    const SHEETS_PER_PAGE = 4;
-    const startMarginX = 37.5;
-    const startMarginY = 15;
+    // กำหนดตำแหน่งพิกัดยัดลงหน้า A4 แนวนอน (ใบปะหน้ากว้าง 120mm สูง 60mm แนวนอนเท่าของจริง)
+    // แนวนอนกว้าง 297mm วางได้ 2 คอลัมน์ (2 × 120mm = 240mm + ช่องไฟ 15mm = 255mm ยังพอดีในหน้ากว้าง 297mm)
+    // แนวตั้งสูง 210mm วางได้ 3 แถว (3 × 60mm = 180mm + ช่องไฟ 2×9mm = 198mm พอดีกับความสูงหน้า 210mm)
+    // รวมสูงสุด 2 คอลัมน์ × 3 แถว = 6 ใบ/หน้า
+    const SHEETS_PER_PAGE = 6;
+    const SHEET_W = 120;
+    const SHEET_H = 60;
+    const COLS = 2;
     const gapX = 15;
-    const gapY = 27;
+    const gapY = 9;
+    const startMarginX = (297 - (COLS * SHEET_W + (COLS - 1) * gapX)) / 2;
+    const startMarginY = (210 - (3 * SHEET_H + 2 * gapY)) / 2;
 
     sheetsToExport.forEach((sheet, idx)=>{
       const posIndex = idx % SHEETS_PER_PAGE;
 
       if (idx > 0 && posIndex === 0) {
-        doc.addPage('a4', 'portrait');
+        doc.addPage('a4', 'landscape');
       }
 
-      // คำนวณหาตำแหน่งแบบ Row & Column บนกระดาษ A4 (2 คอลัมน์ × 2 แถว)
-      const row = Math.floor(posIndex / 2);
-      const col = posIndex % 2;
+      const col = posIndex % COLS;
+      const row = Math.floor(posIndex / COLS);
 
-      const posX = startMarginX + col * (60 + gapX);
-      const posY = startMarginY + row * (120 + gapY);
+      const posX = startMarginX + col * (SHEET_W + gapX);
+      const posY = startMarginY + row * (SHEET_H + gapY);
 
       drawMiniSheetToPosition(doc, sheet, posX, posY);
     });
 
     doc.save('ใบปะหน้าลอตเตอรี่_ชุดรวมพิมพ์_A4.pdf');
-    showStatus('ดาวน์โหลดไฟล์ PDF สำเร็จ! ใบปะหน้าจะถูกจัดเรียงในหน้า A4 ขนาดใบละ 6x12 cm เท่าใบสลากจริง สั่งปริ้นแล้วตัดแบ่งได้ทันทีครับ', 'success');
+    showStatus('ดาวน์โหลดไฟล์ PDF สำเร็จ! ใบปะหน้าจะถูกจัดเรียงในหน้า A4 ขนาดใบละ 12x6 cm เท่าใบสลากจริง สั่งปริ้นแล้วตัดแบ่งได้ทันทีครับ', 'success');
   } catch(e){
     showStatus('สร้าง PDF ไม่สำเร็จ: ' + e.message, 'error');
   }
