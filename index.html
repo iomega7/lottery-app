@@ -42,9 +42,25 @@
   .preview-box { border: 1px dashed #ccc; padding: 6px; background: #fff; border-radius: 6px; text-align: center; }
   .preview-box span { display: block; font-size: 11px; color: #666; margin-bottom: 4px; }
   .quick-box { background: #fcf8e3; border: 1px solid #fbeed5; padding: 12px; border-radius: 8px; margin-bottom: 14px; }
+  #lockOverlay { position:fixed; inset:0; background:#f4f4f2; z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .lock-box { background:#fff; border:1px solid #ddd; border-radius:10px; padding:24px; max-width:300px; width:100%; text-align:center; }
+  .lock-box h2 { margin-top:0; }
+  .lock-box input { width:100%; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:6px; margin:12px 0; text-align:center; box-sizing:border-box; }
+  .lock-box button { width:100%; }
+  .lock-error { color:#c0392b; font-size:13px; margin-top:8px; min-height:16px; }
 </style>
 </head>
 <body>
+
+<div id="lockOverlay">
+  <div class="lock-box">
+    <h2>🔒 กรุณาใส่รหัสผ่าน</h2>
+    <input type="password" id="lockPasswordInput" placeholder="รหัสผ่าน" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="primary" onclick="checkLockPassword()">เข้าใช้งาน</button>
+    <div class="lock-error" id="lockError"></div>
+  </div>
+</div>
+
 <div class="wrap">
 
   <h1>โปรแกรมสแกน QR ลอตเตอรี่ → ใบปะหน้าขนาดเท่าของจริง (12 × 6 ซม.)</h1>
@@ -103,6 +119,31 @@
   window.zxingReadBarcodes = readBarcodes;
 </script>
 <script>
+// หน้าป้องกันด้วยรหัสผ่าน (กันคนทั่วไปเปิดเจอโดยบังเอิญ ไม่ใช่การรักษาความปลอดภัยจริง เพราะเป็นหน้าเว็บสถิตไม่มีเซิร์ฟเวอร์)
+const APP_PASSWORD = 'ninjindamas';
+function checkLockPassword(){
+  const input = document.getElementById('lockPasswordInput');
+  if (input.value === APP_PASSWORD){
+    try { localStorage.setItem('lottery-app-unlocked', '1'); } catch(e){}
+    document.getElementById('lockOverlay').style.display = 'none';
+  } else {
+    document.getElementById('lockError').textContent = 'รหัสผ่านไม่ถูกต้อง';
+    input.value = '';
+    input.focus();
+  }
+}
+(function(){
+  const input = document.getElementById('lockPasswordInput');
+  input.addEventListener('keypress', (e)=>{ if (e.key === 'Enter') checkLockPassword(); });
+  let unlocked = false;
+  try { unlocked = localStorage.getItem('lottery-app-unlocked') === '1'; } catch(e){}
+  if (unlocked){
+    document.getElementById('lockOverlay').style.display = 'none';
+  } else {
+    input.focus();
+  }
+})();
+
 let state = {
   sheets: [{ id: 1, items: [] }],
   activeSheetIndex: 0
