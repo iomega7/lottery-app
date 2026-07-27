@@ -21,11 +21,12 @@ A small static web app for recording Thai Government Lottery ticket numbers (by 
 
 ## Files
 
-- `Lottery APP.html` — the working/source file; make edits here.
-- `index.html` — an exact copy, served by GitHub Pages at the repo root. **Must be manually kept in sync** whenever `Lottery APP.html` changes:
-  ```
-  cp "Lottery APP.html" index.html
-  ```
+- `index.html` — the whole app: markup, styles, and script in one file. Edit it directly;
+  GitHub Pages serves it at the repo root, so the name is fixed.
+
+There used to be a second copy, `Lottery APP.html`, kept byte-identical by hand. Nothing
+enforced that, so the served page could silently drift from the file being edited. It was
+removed on 2026-07-27; `index.html` is now the only source.
 
 ## Tech notes
 
@@ -36,7 +37,7 @@ A small static web app for recording Thai Government Lottery ticket numbers (by 
 
 ## Security / password gate
 
-- A password prompt blocks the app until the correct passphrase is entered. It's defined as the `APP_PASSWORD` constant near the top of the `<script>` block in both HTML files.
+- A password prompt blocks the app until the correct passphrase is entered. It's defined as the `APP_PASSWORD` constant near the top of the `<script>` block in `index.html`.
 - **This is a casual deterrent, not real security.** Since the site is a static page with no server, anyone opening browser dev tools can read the passphrase straight from the page source or bypass the check entirely. Don't rely on it to protect anything sensitive, and don't reuse a real password here.
 - Once unlocked, the state is remembered per browser/device via `localStorage`, so you won't be asked again on that same browser — until: you clear that site's browsing data, you switch browsers or devices, you use Private/Incognito mode, you use "Add to Home Screen" for the first time (separate storage context), or (rarely) Safari's tracking-prevention cleanup clears storage after ~7 days without a visit.
 
@@ -48,6 +49,7 @@ A small static web app for recording Thai Government Lottery ticket numbers (by 
 
 ## Changelog
 
+- **2026-07-27** — Removed the duplicate `Lottery APP.html`; `index.html` is now the single source file.
 - **2026-07-17** — Added a password gate before the app loads (client-side only, see Security notes above).
 - **2026-07-08** — Removed the unreliable live-camera QR scanner; simplified section 1 to a single photo-picker button with clearer instructions.
 - **2026-07-08** — Added `index.html` and enabled GitHub Pages (repo made public); live app first published.
