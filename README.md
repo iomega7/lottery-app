@@ -53,6 +53,8 @@ removed on 2026-07-27; `index.html` is now the only source.
 
 ## Changelog
 
+- **2026-07-28** — Duplicate detection now covers every sheet, not just the one being edited, so the same
+  ticket photographed onto two different sheets is caught. The message names the sheet it is already on.
 - **2026-07-28** — Added a per-sheet "ล้างเฉพาะใบ #N" button (small outlined pill under the grid, deliberately
   unlike the solid red clear-all) so a sheet that got the wrong entries can be redone without wiping the others.
   It also unticks that sheet in the section-3 export list, so a freshly emptied sheet can't be printed blank.

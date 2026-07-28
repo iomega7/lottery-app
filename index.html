@@ -174,6 +174,18 @@ function saveState(){
   try { localStorage.setItem('lottery-cover-app-state', JSON.stringify(state)); } catch(e){ console.error(e); }
 }
 
+// หาว่าเลขนี้เคยบันทึกไว้ในใบไหนแล้วหรือยัง — ต้องไล่ดู "ทุกใบ" ไม่ใช่เฉพาะใบที่เปิดอยู่
+// สลากใบเดียวกันถูกถ่ายซ้ำลงคนละใบได้ง่ายมาก และถ้าหลุดไปคือจำนวนสลากที่นับได้ผิดทันที
+// คืนค่าเป็นตัวใบที่เจอ (เพื่อเอาไปบอกผู้ใช้ว่าไปดูที่ใบไหน) หรือ null ถ้ายังไม่ซ้ำ
+let lastDuplicateNotice = null;
+function findDuplicateSheet(set, number){
+  return state.sheets.find(s => s.items.some(x => x.set === set && x.number === number)) || null;
+}
+function duplicateMessage(sheet, set, number){
+  const where = (sheet === state.sheets[state.activeSheetIndex]) ? 'ในใบนี้' : `ในใบ #${sheet.id}`;
+  return `เลข ${number} (ชุดที่ ${set}) บันทึกไว้แล้ว${where}`;
+}
+
 function addManualEntry() {
   const setEl = document.getElementById('manualSet');
   const numEl = document.getElementById('manualNum');
@@ -191,8 +203,9 @@ function addManualEntry() {
     alert('ใบปะหน้านี้เต็ม 20 รายการแล้วครับ');
     return;
   }
-  if (sheet.items.some(x => x.set === setVal && x.number === numVal)) {
-    alert('หมายเลขนี้ได้ทำการบันทึกไว้แล้ว');
+  const dupSheet = findDuplicateSheet(setVal, numVal);
+  if (dupSheet) {
+    alert(duplicateMessage(dupSheet, setVal, numVal));
     return;
   }
 
@@ -213,6 +226,7 @@ document.getElementById('qrFileInput').addEventListener('change', async (e)=>{
   showStatus(`กำลังอ่านโค้ดจาก ${files.length} ไฟล์...`, 'info');
   let detected = 0;
   let found = 0;
+  lastDuplicateNotice = null;
   for (const file of files){
     try {
       const texts = await decodeAllFromFile(file);
@@ -228,7 +242,7 @@ document.getElementById('qrFileInput').addEventListener('change', async (e)=>{
   if (found > 0){
     showStatus(`เพิ่มข้อมูลสำเร็จ ${found} ใบ`, 'success');
   } else if (detected > 0){
-    showStatus('หมายเลขนี้ได้ทำการบันทึกไว้แล้ว', 'info');
+    showStatus(lastDuplicateNotice || 'หมายเลขนี้ได้ทำการบันทึกไว้แล้ว', 'info');
   } else {
     showStatus('ไม่พบโค้ดในรูปที่เลือก ลองถ่ายให้โค้ดอยู่ใกล้และคมชัดขึ้น', 'error');
   }
@@ -376,8 +390,11 @@ function handleDecodedText(text){
     showStatus('ใบปะหน้านี้เต็ม 20 รายการแล้วครับ', 'error');
     return false;
   }
-  if (sheet.items.some(x => x.set === parsed.set && x.number === parsed.number)) {
-    showStatus('หมายเลขนี้ได้ทำการบันทึกไว้แล้ว', 'info');
+  const dupSheet = findDuplicateSheet(parsed.set, parsed.number);
+  if (dupSheet) {
+    // เก็บข้อความไว้ด้วย เพราะตอนเลือกรูปทีละหลายไฟล์ ข้อความสรุปตอนจบจะเขียนทับแบนเนอร์นี้
+    lastDuplicateNotice = duplicateMessage(dupSheet, parsed.set, parsed.number);
+    showStatus(lastDuplicateNotice, 'info');
     return false;
   }
   sheet.items.push({ set: parsed.set, number: parsed.number, lengthMismatch: false });
