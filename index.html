@@ -31,6 +31,11 @@
   .half-block table { width:auto; }
   .tbl-num { flex:1; }
   .sheet-summary { grid-column:1 / -1; display:flex; justify-content:flex-end; align-items:center; border-top:1px solid #ddd; padding-top:8px; margin-top:4px; font-size:11px; }
+  /* ปุ่มล้างเฉพาะใบ: จงใจทำให้เล็กและเป็นเส้นขอบบาง ๆ ไม่ใช่ปุ่มแดงทึบแบบ .danger
+     เพื่อไม่ให้สับสนกับ "ล้างข้อมูลทั้งหมด" ที่อยู่หัวการ์ดเดียวกัน */
+  .btn-clear-sheet { margin-right:auto; font-size:11px; padding:3px 10px; border-radius:12px; background:#fff; color:#c0392b; border:1px solid #e0b4ae; }
+  .btn-clear-sheet:disabled { color:#aaa; border-color:#ddd; }
+  .btn-clear-sheet.confirming { background:#c0392b; color:#fff; border-color:#c0392b; font-weight:bold; }
   .status { font-size:12px; padding:2px 8px; border-radius:10px; }
   .status.full { background:#dff0d8; color:#3c763d; }
   .status.partial { background:#f0f0f0; color:#666; }
@@ -383,6 +388,11 @@ function handleDecodedText(text){
 }
 
 function renderSheets(){
+  // ทุกครั้งที่หน้าจอถูกวาดใหม่ (สลับแท็บ / เพิ่มรายการ / สร้างใบใหม่) ให้ยกเลิกสถานะ "รอกดยืนยัน"
+  // ของปุ่มล้างทั้งสองอัน กันเคสกดยืนยันค้างไว้ที่ใบหนึ่ง แล้วสลับไปอีกใบแล้วกดซ้ำ = ล้างผิดใบ
+  cancelClearSheetConfirm();
+  cancelClearAllConfirm();
+
   const tabs = document.getElementById('sheetTabs');
   tabs.innerHTML = '';
   state.sheets.forEach((sheet, i)=>{
@@ -407,7 +417,8 @@ function renderSheets(){
 
   const grid = document.getElementById('sheetGrid');
   grid.innerHTML = '';
-  const items = state.sheets[state.activeSheetIndex].items;
+  const activeSheet = state.sheets[state.activeSheetIndex];
+  const items = activeSheet.items;
   [ [1,10], [11,20] ].forEach(([start,end])=>{
     let rowsSet = '', rowsNum = '';
     for (let n=start; n<=end; n++){
@@ -431,7 +442,19 @@ function renderSheets(){
 
   const summary = document.createElement('div');
   summary.className = 'sheet-summary';
-  summary.innerHTML = `<span>รวม <b>${items.length}</b> ชุด</span>`;
+
+  const clearSheetBtn = document.createElement('button');
+  clearSheetBtn.id = 'clearSheetBtn';
+  clearSheetBtn.className = 'btn-clear-sheet';
+  clearSheetBtn.textContent = clearSheetLabel(activeSheet.id);
+  clearSheetBtn.disabled = items.length === 0;
+  clearSheetBtn.onclick = clearSheet;
+  summary.appendChild(clearSheetBtn);
+
+  const total = document.createElement('span');
+  total.innerHTML = `รวม <b>${items.length}</b> ชุด`;
+  summary.appendChild(total);
+
   grid.appendChild(summary);
 
   renderExportChecklist();
@@ -620,21 +643,56 @@ async function exportPDF(){
 
 let clearConfirmPending = false;
 let clearConfirmTimeout = null;
+function cancelClearAllConfirm(){
+  clearTimeout(clearConfirmTimeout);
+  clearConfirmPending = false;
+  const btn = document.getElementById('clearAllBtn');
+  if (btn) btn.textContent = 'ล้างข้อมูลทั้งหมด';
+}
 function clearAll(){
   const btn = document.getElementById('clearAllBtn');
   if (!clearConfirmPending){
     clearConfirmPending = true;
     btn.textContent = 'กดอีกครั้งเพื่อยืนยันการล้าง';
-    clearConfirmTimeout = setTimeout(()=>{
-      clearConfirmPending = false;
-      btn.textContent = 'ล้างข้อมูลทั้งหมด';
-    }, 4000);
+    clearConfirmTimeout = setTimeout(cancelClearAllConfirm, 4000);
     return;
   }
-  clearTimeout(clearConfirmTimeout);
-  clearConfirmPending = false;
-  btn.textContent = 'ล้างข้อมูลทั้งหมด';
+  cancelClearAllConfirm();
   doClearAll();
+}
+
+// ล้างเฉพาะใบที่เปิดอยู่ ใบอื่นและลำดับใบไม่ถูกแตะต้อง
+// สถานะรอยืนยันแยกตัวแปรจากปุ่มล้างทั้งหมดโดยเจตนา ถ้าใช้ร่วมกันจะกลายเป็นว่า
+// กดปุ่มนี้ 1 ครั้งแล้วไปกด "ล้างข้อมูลทั้งหมด" จะล้างหมดทันทีโดยไม่ถามซ้ำ
+let clearSheetConfirmPending = false;
+let clearSheetConfirmTimeout = null;
+function clearSheetLabel(id){ return `ล้างเฉพาะใบ #${id}`; }
+function cancelClearSheetConfirm(){
+  clearTimeout(clearSheetConfirmTimeout);
+  clearSheetConfirmPending = false;
+  const btn = document.getElementById('clearSheetBtn');
+  if (btn){
+    btn.classList.remove('confirming');
+    btn.textContent = clearSheetLabel(state.sheets[state.activeSheetIndex].id);
+  }
+}
+function clearSheet(){
+  const btn = document.getElementById('clearSheetBtn');
+  const sheet = state.sheets[state.activeSheetIndex];
+  if (!clearSheetConfirmPending){
+    clearSheetConfirmPending = true;
+    btn.classList.add('confirming');
+    btn.textContent = 'กดอีกครั้งเพื่อยืนยัน';
+    clearSheetConfirmTimeout = setTimeout(cancelClearSheetConfirm, 4000);
+    return;
+  }
+  cancelClearSheetConfirm();
+  sheet.items = [];
+  // เอาใบนี้ออกจากรายการติ๊กส่งออก ไม่งั้นจะเผลอพิมพ์ใบเปล่าออกมา
+  selectedForExport.delete(sheet.id);
+  saveState();
+  renderSheets();
+  showStatus(`ล้างรายการในใบปะหน้า #${sheet.id} เรียบร้อยแล้ว (ใบอื่นไม่กระทบ)`, 'success');
 }
 
 async function doClearAll(){

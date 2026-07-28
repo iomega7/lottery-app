@@ -16,6 +16,10 @@ A small static web app for recording Thai Government Lottery ticket numbers (by 
    - Tap "📷 ถ่ายรูป / เลือกรูปสลาก" to take a photo of a ticket or pick one from your photo library; the app decodes the QR/Data Matrix code automatically, or
    - Type ชุดที่ and เลขรางวัล directly and tap "+ เพิ่มเข้าใบปะหน้า".
 2. Switch between sheets using the tabs in section 2 (max 6 sheets, 20 entries each).
+   - Got entries on the wrong sheet (e.g. kept shooting photos without tapping "+ ใบใหม่" first)?
+     Use the small "ล้างเฉพาะใบ #N" button under the grid to empty just that sheet and redo it —
+     the other sheets keep their entries. Tap it twice to confirm.
+   - "ล้างข้อมูลทั้งหมด" at the top of section 2 still wipes every sheet.
 3. In section 3, check the sheets you want to print (or tap "เลือกทั้งหมด" to select all), then tap "ดาวน์โหลดเป็นไฟล์ PDF สำหรับพิมพ์บน A4".
 4. Print the PDF on A4 paper — each sheet comes out at real ticket size for easy checking/filing.
 
@@ -49,6 +53,9 @@ removed on 2026-07-27; `index.html` is now the only source.
 
 ## Changelog
 
+- **2026-07-28** — Added a per-sheet "ล้างเฉพาะใบ #N" button (small outlined pill under the grid, deliberately
+  unlike the solid red clear-all) so a sheet that got the wrong entries can be redone without wiping the others.
+  It also unticks that sheet in the section-3 export list, so a freshly emptied sheet can't be printed blank.
 - **2026-07-27** — Removed the duplicate `Lottery APP.html`; `index.html` is now the single source file.
 - **2026-07-17** — Added a password gate before the app loads (client-side only, see Security notes above).
 - **2026-07-08** — Removed the unreliable live-camera QR scanner; simplified section 1 to a single photo-picker button with clearer instructions.
